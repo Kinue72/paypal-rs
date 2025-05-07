@@ -63,7 +63,7 @@ pub struct Address {
 }
 
 /// Represents money
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Builder)]
+#[derive(Debug, Default, Serialize, Deserialize, Eq, PartialEq, Clone, Builder)]
 #[builder(setter(strip_option, into))]
 pub struct Money {
     /// The [three-character ISO-4217 currency code](https://developer.paypal.com/docs/integration/direct/rest/currency-codes/) that identifies the currency.
@@ -73,6 +73,36 @@ pub struct Money {
     /// - A decimal fraction for currencies like TND that are subdivided into thousandths.
     ///
     /// For the required number of decimal places for a currency code, see [Currency Codes](https://developer.paypal.com/docs/api/reference/currency-codes/).
+    pub value: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Copy)]
+#[allow(missing_docs)]
+pub enum UpcType {
+    #[serde(rename = "UPC-A")]
+    UpcA,
+    #[serde(rename = "UPC-B")]
+    UpcB,
+    #[serde(rename = "UPC-C")]
+    UpcC,
+    #[serde(rename = "UPC-D")]
+    UpcD,
+    #[serde(rename = "UPC-E")]
+    UpcE,
+    #[serde(rename = "UPC-2")]
+    Upc2,
+    #[serde(rename = "UPC-5")]
+    Upc5,
+}
+
+/// Represents an item UPC code.
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Builder)]
+#[builder(setter(strip_option, into))]
+pub struct ItemUpc {
+    /// The Universal Product Code type.
+    #[serde(rename = "type")]
+    pub upc_type: UpcType,
+    /// The UPC product code of the item.
     pub value: String,
 }
 
@@ -124,7 +154,7 @@ pub struct LinkDescription {
 }
 
 /// ISO-4217 currency codes.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub enum Currency {
     /// Australian dollar
     AUD,
@@ -139,6 +169,7 @@ pub enum Currency {
     /// Danish krone
     DKK,
     /// Euro
+    #[default]
     EUR,
     /// Hong Kong dollar
     HKD,
@@ -178,12 +209,6 @@ pub enum Currency {
     THB,
     /// United States dollar
     USD,
-}
-
-impl Default for Currency {
-    fn default() -> Self {
-        Self::EUR
-    }
 }
 
 impl std::fmt::Display for Currency {
@@ -239,6 +264,8 @@ pub struct AuthorizationStatusDetails {
 pub enum AuthorizationStatusDetailsReason {
     /// Authorization is pending manual review.
     PendingReview,
+    /// Risk Filter set by the payee failed for the transaction.
+    DeclinedByRiskFraudFilters,
 }
 
 /// Indicates whether the transaction is eligible for seller protection.

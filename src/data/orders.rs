@@ -36,6 +36,10 @@ pub struct PayerName {
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Builder)]
 #[builder(setter(strip_option))]
 pub struct PhoneNumber {
+    /// The country calling code (CC), in its canonical international E.164 numbering plan format.
+    /// The combined length of the CC and the national number must not be greater than 15 digits.
+    /// The national number consists of a national destination code (NDC) and subscriber number (SN).
+    pub country_code: Option<String>,
     /// The national number, in its canonical international E.164 numbering plan format.
     /// The combined length of the country calling code (CC) and the national number must not be greater than 15 digits.
     /// The national number consists of a national destination code (NDC) and subscriber number (SN).
@@ -209,6 +213,11 @@ pub enum DisbursementMode {
 pub struct PaymentInstruction {
     /// An array of various fees, commissions, tips, or donations.
     pub platform_fees: Option<Vec<PlatformFee>>,
+    /// This field is only enabled for selected merchants/partners to use and provides the ability to trigger a specific pricing rate/plan for a payment transaction
+    /// The list of eligible 'payee_pricing_tier_id' would be provided to you by your Account Manager. Specifying values other than the one provided to you by your account manager would result in an error.
+    pub payee_pricing_tier_id: Option<String>,
+    /// FX identifier generated returned by PayPal to be used for payment processing in order to honor FX rate (for eligible integrations) to be used when amount is settled/received into the payee account.
+    pub payee_receivable_fx_rate_id: Option<String>,
     /// The funds that are held on behalf of the merchant.
     pub disbursement_mode: Option<DisbursementMode>,
 }
@@ -236,37 +245,144 @@ pub struct ShippingDetailName {
     pub full_name: String,
 }
 
+/// Method of purchase fulfillment
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Copy)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ShippingType {
+    /// The payer intends to receive the items at a specified address.
+    Shipping,
+    /// DEPRECATED. Please use "PICKUP_FROM_PERSON" instead.
+    PickupInPerson,
+    /// The payer intends to pick up the item(s) from the payee's physical store.
+    /// Also termed as BOPIS, "Buy Online, Pick-up in Store".
+    /// Seller protection is provided with this option.
+    PickupInStore,
+    /// The payer intends to pick up the item(s) from the payee in person.
+    /// Also termed as BOPIP, "Buy Online, Pick-up in Person".
+    /// Seller protection is not available, since the payer is receiving the item from the payee in person, and can validate the item prior to payment.
+    PickupFromPerson,
+}
+
+/// The status of the item shipment.
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Copy)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum TrackerStatus {
+    /// The shipment was cancelled and the tracking number no longer applies.
+    Cancelled,
+    /// The merchant has assigned a tracking number to the items being shipped from the Order.
+    /// This does not correspond to the carrier's actual status for the shipment.
+    /// The latest status of the parcel must be retrieved from the carrier.
+    Shipped,
+}
+/// item in the shipment.
+#[skip_serializing_none]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Builder)]
+pub struct ShipmentItem {
+    /// The item name or title.
+    pub name: Option<String>,
+    /// The item quantity. Must be a whole number.
+    pub quantity: Option<String>,
+    /// The stock keeping unit (SKU) for the item. This can contain unicode characters.
+    pub sku: Option<String>,
+    /// The URL to the item being purchased. Visible to buyer and used in buyer experiences.
+    pub url: Option<String>,
+    /// The URL of the item's image.
+    /// File type and size restrictions apply.
+    /// An image that violates these restrictions will not be honored.
+    pub image_url: Option<String>,
+    /// The Universal Product Code of the item.
+    pub upc: Option<ItemUpc>,
+}
+
+/// trackers for a transaction.
+#[skip_serializing_none]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Builder)]
+pub struct TransactionTracker {
+    /// The tracker id.
+    pub id: Option<String>,
+    /// The status of the item shipment.
+    pub status: Option<TrackerStatus>,
+    /// An array of details of items in the shipment.
+    pub items: Option<Vec<ShipmentItem>>,
+    /// An array of request-related HATEOAS links.
+    pub links: Option<Vec<LinkDescription>>,
+    /// The date and time when the transaction occurred, in Internet date and time format.
+    pub create_time: Option<chrono::DateTime<chrono::Utc>>,
+    /// The date and time when the transaction was last updated, in Internet date and time format.
+    pub update_time: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// Shipping options that the payee or merchant offers to the payer to ship or pick up their items.
+#[skip_serializing_none]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Builder)]
+pub struct ShippingOption {
+    /// A unique ID that identifies a payer-selected shipping option.
+    pub id: String,
+    /// A description that the payer sees, which helps them choose an appropriate shipping option.
+    /// For example, Free Shipping, USPS Priority Shipping, Expédition prioritaire USPS, or USPS yōuxiān fā huò.
+    /// Localize this description to the payer's locale.
+    pub label: String,
+    /// If the API request sets selected = true, it represents the shipping option that the payee
+    /// or merchant expects to be pre-selected for the payer when they
+    /// first view the shipping.options in the PayPal Checkout experience.
+    /// As part of the response if a shipping.option contains selected=true,
+    /// it represents the shipping option that the payer selected during the course of checkout with PayPal.
+    /// Only one shipping.option can be set to selected=true.
+    pub selected: bool,
+    /// A classification for the method of purchase fulfillment.
+    pub shipping_type: Option<ShippingType>,
+    /// The shipping cost for the selected option.
+    pub amount: Option<Money>,
+}
+
 /// The name and address of the person to whom to ship the items.
 #[skip_serializing_none]
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Builder)]
 #[builder(setter(strip_option))]
 pub struct ShippingDetail {
+    /// A classification for the method of purchase fulfillment (e.g shipping, in-store pickup, etc).
+    /// Either type or options may be present, but not both.
+    #[serde(rename = "type")]
+    pub shipping_type: Option<ShippingType>,
+    /// An array of shipping options that the payee or merchant offers to the payer to ship or pick up their items.
+    pub options: Option<Vec<ShippingOption>>,
     /// The name of the person to whom to ship the items. Supports only the full_name property.
     pub name: Option<ShippingDetailName>,
+    /// The phone number of the recipient of the shipped items,
+    /// which may belong to either the payer, or an alternate contact, for delivery. [Format - canonical international E.164 numbering plan]
+    pub phone_number: Option<PhoneNumber>,
     /// The address of the person to whom to ship the items.
     pub address: Option<Address>,
+    /// An array of trackers for a transaction.
+    pub trackers: Option<Vec<TransactionTracker>>,
 }
 
 /// Represents an item.
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, Clone, Builder)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Builder)]
 #[builder(setter(strip_option, into))]
 pub struct Item {
     /// The item name or title.
     pub name: String,
-    /// The item price or rate per unit.
-    /// If you specify unit_amount, purchase_units[].amount.breakdown.item_total is required. Must equal unit_amount * quantity for all items.
-    pub unit_amount: Money,
-    /// The item tax for each unit. If tax is specified, purchase_units[].amount.breakdown.tax_total is required. Must equal tax * quantity for all items.
-    pub tax: Option<Money>,
     /// The item quantity. Must be a whole number.
     pub quantity: String,
     /// The detailed item description.
     pub description: Option<String>,
     /// The stock keeping unit (SKU) for the item.
     pub sku: Option<String>,
+    /// The URL to the item being purchased. Visible to buyer and used in buyer experiences.
+    pub url: Option<String>,
     /// The item category type
     pub category: Option<ItemCategoryType>,
+    /// The URL of the item's image. File type and size restrictions apply. An image that violates these restrictions will not be honored.
+    pub image_url: Option<String>,
+    /// The item price or rate per unit.
+    /// If you specify unit_amount, purchase_units[].amount.breakdown.item_total is required. Must equal unit_amount * quantity for all items.
+    pub unit_amount: Money,
+    /// The item tax for each unit. If tax is specified, purchase_units[].amount.breakdown.tax_total is required. Must equal tax * quantity for all items.
+    pub tax: Option<Money>,
+    /// The Universal Product Code of the item.
+    pub upc: Option<ItemUpc>,
 }
 
 /// The status of the payment authorization.
@@ -291,13 +407,78 @@ pub enum AuthorizationStatus {
     Pending,
 }
 
-/// A payment authorization.
+/// Seller Protection Status
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Copy, Clone)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum SellerProtectionStatus {
+    /// Your PayPal balance remains intact if the customer claims that
+    /// they did not receive an item or the account holder claims that they did not authorize the payment.
+    Eligible,
+    /// Your PayPal balance remains intact if the customer claims that they did not receive an item.
+    PartiallyEligible,
+    /// This transaction is not eligible for seller protection.
+    NotEligible,
+}
+
+/// Seller Protection Data
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
+pub struct SellerProtection {
+    /// Indicates whether the transaction is eligible for seller protection.
+    /// For information, see PayPal Seller Protection for Merchants.
+    pub status: Option<SellerProtectionStatus>,
+    /// An array of conditions that are covered for the transaction.
+    pub dispute_categories: Option<Vec<String>>,
+}
+
+/// Reference values used by the card network to identify a transaction.
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
+pub struct NetworkTransactionReference {
+    /// Transaction reference id returned by the scheme.
+    /// For Visa and Amex, this is the "Tran id" field in response.
+    /// For MasterCard, this is the "BankNet reference id" field in response.
+    /// For Discover, this is the "NRID" field in response.
+    /// The pattern we expect for this field from Visa/Amex/CB/Discover is numeric, Mastercard/BNPP is alphanumeric and Paysecure is alphanumeric with special character -.
+    pub id: String,
+    /// The date that the transaction was authorized by the scheme.
+    /// This field may not be returned for all networks. MasterCard refers to this field as "BankNet reference date.
+    pub date: Option<String>,
+    /// Reference ID issued for the card transaction.
+    /// This ID can be used to track the transaction across processors, card brands and issuing banks.
+    pub acquirer_reference_number: Option<String>,
+    /// Name of the card network through which the transaction was routed.
+    pub network: Option<String>,
+}
+
+/// A payment authorization.
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub struct AuthorizationWithData {
     /// The status for the authorized payment.
     pub status: AuthorizationStatus,
     /// The details of the authorized order pending status.
     pub status_details: AuthorizationStatusDetails,
+    /// The PayPal-generated ID for the authorized payment.
+    pub id: Option<String>,
+    /// The API caller-provided external invoice number for this order.
+    /// Appears in both the payer's transaction history and the emails that the payer receives.
+    pub invoice_id: Option<String>,
+    /// The API caller-provided external ID.
+    /// Used to reconcile API caller-initiated transactions with PayPal transactions.
+    /// Appears in transaction and settlement reports.
+    pub custom_id: Option<String>,
+    /// An array of related HATEOAS links.
+    pub links: Option<Vec<LinkDescription>>,
+    /// The amount for this authorized payment.
+    pub amount: Option<Money>,
+    /// The level of protection offered as defined by PayPal Seller Protection for Merchants.
+    pub seller_protection: Option<SellerProtection>,
+    /// The date and time when the authorized payment expires, in Internet date and time format.
+    pub expiration_time: Option<chrono::DateTime<chrono::Utc>>,
+    /// The date and time when the transaction occurred, in Internet date and time format.
+    pub create_time: Option<chrono::DateTime<chrono::Utc>>,
+    /// The date and time when the transaction was last updated, in Internet date and time format.
+    pub update_time: Option<chrono::DateTime<chrono::Utc>>,
+    ///The processor response information for payment requests, such as direct credit card transactions.
+    pub processor_response: Option<serde_json::Value>,
 }
 
 /// The capture status.
@@ -355,15 +536,82 @@ pub struct CaptureStatusDetails {
     pub reason: CaptureStatusDetailsReason,
 }
 
+/// Exchange Rate Detail
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ExchangeRateDetail {
+    /// The target currency amount. Equivalent to one unit of the source currency.
+    /// Formatted as integer or decimal value with one to 15 digits to the right of the decimal point.
+    pub value: String,
+    /// The source currency from which to convert an amount.
+    pub source_currency: Option<String>,
+    /// The target currency to which to convert an amount.
+    pub target_currency: Option<String>,
+}
+
+/// Seller Receivable Breakdown
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SellerReceivableBreakdown {
+    /// An array of platform or partner fees, commissions, or brokerage fees that associated with the captured payment.
+    pub platform_fees: Option<Vec<PlatformFee>>,
+    /// The amount for this captured payment in the currency of the transaction.
+    pub gross_amount: Money,
+    /// The applicable fee for this captured payment in the currency of the transaction.
+    pub paypal_fee: Money,
+    /// The applicable fee for this captured payment in the receivable currency.
+    /// Returned only in cases the fee is charged in the receivable currency. Example 'CNY'.
+    pub paypal_fee_in_receivable_currency: Option<Money>,
+    /// The net amount that the payee receives for this captured payment in their PayPal account.
+    /// The net amount is computed as gross_amount minus the paypal_fee minus the platform_fees.
+    pub net_amount: Option<Money>,
+    /// The net amount that is credited to the payee's PayPal account.
+    /// Returned only when the currency of the captured payment is different from the currency of the PayPal account where the payee wants to credit the funds.
+    /// The amount is computed as net_amount times exchange_rate.
+    pub receivable_amount: Option<Money>,
+    /// The exchange rate that determines the amount that is credited to the payee's PayPal account.
+    /// Returned when the currency of the captured payment is different from the currency of the PayPal account where the payee wants to credit the funds.
+    pub exchange_rate: Option<ExchangeRateDetail>,
+}
+
 /// A captured payment.
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Copy, Clone, Builder)]
+#[derive(Debug, Serialize, Deserialize, Clone, Builder)]
 #[builder(setter(strip_option))]
 pub struct Capture {
+    /// The date and time when the transaction occurred, in Internet date and time format.
+    pub create_time: Option<chrono::DateTime<chrono::Utc>>,
+    /// The date and time when the transaction was last updated, in Internet date and time format.
+    pub update_time: Option<chrono::DateTime<chrono::Utc>>,
+    /// The PayPal-generated ID for the captured payment.
+    pub id: Option<String>,
+    /// The API caller-provided external invoice number for this order.
+    /// Appears in both the payer's transaction history and the emails that the payer receives.
+    pub invoice_id: Option<String>,
+    /// The API caller-provided external ID.
+    /// Used to reconcile API caller-initiated transactions with PayPal transactions.
+    /// Appears in transaction and settlement reports.
+    pub custom_id: Option<String>,
+    /// Indicates whether you can make additional captures against the authorized payment.
+    /// Set to true if you do not intend to capture additional payments against the authorization.
+    /// Set to false if you intend to capture additional payments against the authorization.
+    pub final_capture: Option<bool>,
+    /// An array of related HATEOAS links.
+    pub links: Option<Vec<LinkDescription>>,
+    /// The amount for this captured payment.
+    pub amount: Money,
+    /// Reference values used by the card network to identify a transaction.
+    pub network_transaction_reference: Option<NetworkTransactionReference>,
+    /// The level of protection offered as defined by PayPal Seller Protection for Merchants.
+    pub seller_protection: Option<SellerProtection>,
     /// The status of the captured payment.
     pub status: CaptureStatus,
     /// The details of the captured payment status.
     pub status_details: Option<CaptureStatusDetails>,
+    /// The detailed breakdown of the capture activity. This is not available for transactions that are in pending state.
+    pub seller_receivable_breakdown: Option<SellerReceivableBreakdown>,
+    /// The funds that are held on behalf of the merchant.
+    pub disbursement_mode: Option<DisbursementMode>,
+    ///An object that provides additional processor information for a direct credit card transaction.
+    pub processor_response: Option<serde_json::Value>,
 }
 
 /// The status of the refund
@@ -376,6 +624,8 @@ pub enum RefundStatus {
     Pending,
     /// The funds for this transaction were debited to the customer's account.
     Completed,
+    /// The refund could not be processed.
+    Failed,
 }
 
 /// Refund status reason.
@@ -419,20 +669,20 @@ pub struct NetAmountBreakdown {
 #[derive(Debug, Serialize, Deserialize, Clone, Builder)]
 #[builder(setter(strip_option))]
 pub struct SellerPayableBreakdown {
-    /// The amount that the payee refunded to the payer.
-    pub gross_amount: Money,
-    /// The net amount that the payee's account is debited in the transaction currency. The net amount is calculated as gross_amount minus paypal_fee minus platform_fees.
-    pub net_amount: Money,
-    /// An array of breakdown values for the net amount. Returned when the currency of the refund is different from the currency of the PayPal account where the payee holds their funds.
-    pub net_amount_breakdown: Option<Vec<NetAmountBreakdown>>,
-    /// The net amount that the payee's account is debited in the receivable currency. Returned only in cases when the receivable currency is different from transaction currency. Example 'CNY'.
-    pub net_amount_in_receivable_currency: Option<Money>,
-    /// The PayPal fee that was refunded to the payer in the currency of the transaction. This fee might not match the PayPal fee that the payee paid when the payment was captured.
-    pub paypal_fee: Money,
-    /// The PayPal fee that was refunded to the payer in the receivable currency. Returned only in cases when the receivable currency is different from transaction currency. Example 'CNY'.
-    pub paypal_fee_in_receivable_currency: Option<Money>,
     /// An array of platform or partner fees, commissions, or brokerage fees for the refund.
     pub platform_fees: Option<Vec<PlatformFee>>,
+    /// An array of breakdown values for the net amount. Returned when the currency of the refund is different from the currency of the PayPal account where the payee holds their funds.
+    pub net_amount_breakdown: Option<Vec<NetAmountBreakdown>>,
+    /// The amount that the payee refunded to the payer.
+    pub gross_amount: Option<Money>,
+    /// The PayPal fee that was refunded to the payer in the currency of the transaction. This fee might not match the PayPal fee that the payee paid when the payment was captured.
+    pub paypal_fee: Option<Money>,
+    /// The PayPal fee that was refunded to the payer in the receivable currency. Returned only in cases when the receivable currency is different from transaction currency. Example 'CNY'.
+    pub paypal_fee_in_receivable_currency: Option<Money>,
+    /// The net amount that the payee's account is debited in the transaction currency. The net amount is calculated as gross_amount minus paypal_fee minus platform_fees.
+    pub net_amount: Option<Money>,
+    /// The net amount that the payee's account is debited in the receivable currency. Returned only in cases when the receivable currency is different from transaction currency. Example 'CNY'.
+    pub net_amount_in_receivable_currency: Option<Money>,
     /// The total amount refunded from the original capture to date. For example, if a payer makes a $100 purchase and was refunded $20 a week ago and was refunded $30 in this refund, the gross_amount is $30 for this refund and the total_refunded_amount is $50.
     pub total_refunded_amount: Money,
 }
@@ -447,16 +697,27 @@ pub struct Refund {
     pub status_details: Option<RefundStatusDetails>,
     /// The PayPal-generated ID for the refund.
     pub id: String,
-    /// The amount that the payee refunded to the payer.
-    pub amount: Money,
     /// The API caller-provided external invoice number for this order. Appears in both the payer's transaction history and the emails that the payer receives.
     pub invoice_id: Option<String>,
-    /// An array of related HATEOAS links.
-    pub links: Vec<LinkDescription>,
+    /// The API caller-provided external ID. Used to reconcile API caller-initiated transactions with PayPal transactions. Appears in transaction and settlement reports.
+    pub customer_id: Option<String>,
+    /// Reference ID issued for the card transaction.
+    /// This ID can be used to track the transaction across processors, card brands and issuing banks.
+    pub acquirer_reference_number: Option<String>,
     /// The reason for the refund. Appears in both the payer's transaction history and the emails that the payer receives.
     pub note_to_payer: Option<String>,
     /// The breakdown of the refund.
     pub seller_payable_breakdown: SellerPayableBreakdown,
+    /// An array of related HATEOAS links.
+    pub links: Vec<LinkDescription>,
+    /// The amount that the payee refunded to the payer.
+    pub amount: Money,
+    /// The details associated with the merchant for this transaction.
+    pub payer: Option<Payer>,
+    /// The date and time when the transaction occurred, in Internet date and time format.
+    pub create_time: Option<chrono::DateTime<chrono::Utc>>,
+    /// The date and time when the transaction was last updated, in Internet date and time format.
+    pub update_time: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// The comprehensive history of payments for the purchase unit.
@@ -473,6 +734,40 @@ pub struct PaymentCollection {
     #[serde(default)]
     pub refunds: Vec<Refund>,
 }
+/// Supplementary customer struct.
+#[skip_serializing_none]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Builder)]
+pub struct SupplementaryCustomer {
+    /// The consumer's IP address, which can be represented in either IPv4 or IPv6 format.
+    pub ip_address: Option<String>,
+}
+
+/// Supplementary customer parameters
+#[skip_serializing_none]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Builder)]
+pub struct SupplementaryRisk {
+    /// Profile information of the sender or receiver.
+    pub customer: Option<SupplementaryCustomer>,
+}
+
+/// Supplementary data about this payment.
+#[skip_serializing_none]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, Builder)]
+pub struct SupplementaryData {
+    // todo: add support for card 2 and card 3
+    /// The level 2 card processing data collections.
+    /// If your merchant account has been configured for
+    /// Level 2 processing this field will be passed to the processor on your behalf.
+    /// Please contact your PayPal Technical Account Manager to define level 2 data for your business.
+    pub level_2: Option<serde_json::Value>,
+    /// The level 3 card processing data collections,
+    /// If your merchant account has been configured for
+    /// Level 3 processing this field will be passed to the processor on your behalf.
+    /// Please contact your PayPal Technical Account Manager to define level 3 data for your business.
+    pub level_3: Option<serde_json::Value>,
+    /// Merchants and partners can add additional customer parameters that can help with better fraud protection and reduced risk for unbranded card payments.
+    pub risk: Option<SupplementaryRisk>,
+}
 
 /// Represents either a full or partial order that the payer intends to purchase from the payee.
 #[skip_serializing_none]
@@ -482,20 +777,6 @@ pub struct PurchaseUnit {
     /// The API caller-provided external ID for the purchase unit. Required for multiple purchase units when you must update the order through PATCH.
     /// If you omit this value and the order contains only one purchase unit, PayPal sets this value to default.
     pub reference_id: Option<String>,
-    /// The total order amount with an optional breakdown that provides details, such as the total item amount,
-    /// total tax amount, shipping, handling, insurance, and discounts, if any.
-    ///
-    /// If you specify amount.breakdown, the amount equals item_total plus tax_total plus shipping plus handling plus insurance minus shipping_discount minus discount.
-    ///
-    /// The amount must be a positive number. For listed of supported currencies and decimal precision,
-    /// see the PayPal REST APIs [Currency Codes](https://developer.paypal.com/docs/integration/direct/rest/currency-codes/).
-    pub amount: Amount,
-    /// The merchant who receives payment for this transaction.
-    pub payee: Option<Payee>,
-    /// Any additional payment instructions for PayPal Commerce Platform customers.
-    /// Enables features for the PayPal Commerce Platform, such as delayed disbursement and collection of a platform fee.
-    /// Applies during order creation for captured payments or during capture of authorized payments.
-    pub payment_instruction: Option<PaymentInstruction>,
     /// The purchase description.
     pub description: Option<String>,
     /// The API caller-provided external ID. Used to reconcile client transactions with PayPal transactions.
@@ -515,6 +796,20 @@ pub struct PurchaseUnit {
     pub soft_descriptor: Option<String>,
     /// An array of items that the customer purchases from the merchant.
     pub items: Option<Vec<Item>>,
+    /// The total order amount with an optional breakdown that provides details, such as the total item amount,
+    /// total tax amount, shipping, handling, insurance, and discounts, if any.
+    ///
+    /// If you specify amount.breakdown, the amount equals item_total plus tax_total plus shipping plus handling plus insurance minus shipping_discount minus discount.
+    ///
+    /// The amount must be a positive number. For listed of supported currencies and decimal precision,
+    /// see the PayPal REST APIs [Currency Codes](https://developer.paypal.com/docs/integration/direct/rest/currency-codes/).
+    pub amount: Amount,
+    /// The merchant who receives payment for this transaction.
+    pub payee: Option<Payee>,
+    /// Any additional payment instructions for PayPal Commerce Platform customers.
+    /// Enables features for the PayPal Commerce Platform, such as delayed disbursement and collection of a platform fee.
+    /// Applies during order creation for captured payments or during capture of authorized payments.
+    pub payment_instruction: Option<PaymentInstruction>,
     /// The name and address of the person to whom to ship the items.
     pub shipping: Option<ShippingDetail>,
     /// The comprehensive history of payments for the purchase unit.
@@ -781,13 +1076,53 @@ pub struct PaypalPaymentSourceResponse {
 #[derive(Debug, Serialize, Deserialize, Builder, Default, Clone)]
 #[builder(setter(strip_option), default)]
 pub struct PaymentSourceResponse {
-    /// The payment card to use to fund a payment. Card can be a credit or debit card
-    pub card: Option<CardResponse>,
-    /// The customer's wallet used to fund the transaction.
-    pub wallet: Option<WalletResponse>,
+    // /// The payment card to use to fund a payment. Card can be a credit or debit card
+    // pub card: Option<CardResponse>,
+    // /// The customer's wallet used to fund the transaction.
+    // pub wallet: Option<WalletResponse>,
+    // /// The paypal account used to fund the transaction.
+    // pub paypal: Option<PaypalPaymentSourceResponse>,
+    /// The payment card to use to fund a payment. Card can be a credit or debit card.
+    pub card: Option<serde_json::Value>,
 
-    /// The paypal account used to fund the transaction.
-    pub paypal: Option<PaypalPaymentSourceResponse>,
+    /// Information used to pay Bancontact.
+    pub bancontact: Option<serde_json::Value>,
+
+    /// Information used to pay using BLIK.
+    pub blik: Option<serde_json::Value>,
+
+    /// Information used to pay using eps.
+    pub eps: Option<serde_json::Value>,
+
+    /// Information needed to pay using giropay.
+    pub giropay: Option<serde_json::Value>,
+
+    /// Information used to pay using iDEAL.
+    pub ideal: Option<serde_json::Value>,
+
+    /// Information used to pay using MyBank.
+    pub mybank: Option<serde_json::Value>,
+
+    /// Information used to pay using P24(Przelewy24).
+    pub p24: Option<serde_json::Value>,
+
+    /// Information used to pay using Sofort.
+    pub sofort: Option<serde_json::Value>,
+
+    /// Information needed to pay using Trustly.
+    pub trustly: Option<serde_json::Value>,
+
+    /// Venmo wallet response.
+    pub venmo: Option<serde_json::Value>,
+
+    /// The PayPal Wallet response.
+    pub paypal: Option<serde_json::Value>,
+
+    /// Information needed to pay using ApplePay.
+    pub apple_pay: Option<serde_json::Value>,
+
+    /// Google Pay Wallet payment data.
+    pub google_pay: Option<serde_json::Value>,
 }
 
 /// The status of an order.
@@ -818,19 +1153,19 @@ pub struct Order {
     pub update_time: Option<chrono::DateTime<chrono::Utc>>,
     /// The ID of the order.
     pub id: String,
+    /// An array of purchase units. Each purchase unit establishes a contract between a customer and merchant.
+    /// Each purchase unit represents either a full or partial order that the customer intends to purchase from the merchant.
+    pub purchase_units: Option<Vec<PurchaseUnit>>,
+    /// An array of request-related HATEOAS links. To complete payer approval, use the approve link to redirect the payer.
+    pub links: Vec<LinkDescription>,
     /// The payment source used to fund the payment.
     pub payment_source: Option<PaymentSourceResponse>,
     /// The intent to either capture payment immediately or authorize a payment for an order after order creation.
     pub intent: Option<Intent>,
     /// The customer who approves and pays for the order. The customer is also known as the payer.
     pub payer: Option<Payer>,
-    /// An array of purchase units. Each purchase unit establishes a contract between a customer and merchant.
-    /// Each purchase unit represents either a full or partial order that the customer intends to purchase from the merchant.
-    pub purchase_units: Option<Vec<PurchaseUnit>>,
     /// The order status.
     pub status: OrderStatus,
-    /// An array of request-related HATEOAS links. To complete payer approval, use the approve link to redirect the payer.
-    pub links: Vec<LinkDescription>,
 }
 
 /// An invoice number.
