@@ -1,7 +1,7 @@
 use color_eyre::Result;
 use paypal_rs::data::invoice::*;
-use paypal_rs::{api::invoice::*, data::common::Money, PaypalEnv};
-use paypal_rs::{data::common::Currency, Client};
+use paypal_rs::{Client, data::common::Currency};
+use paypal_rs::{PaypalEnv, api::invoice::*, data::common::Money};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -21,14 +21,16 @@ async fn main() -> Result<()> {
                 .name(NameBuilder::default().full_name("Test Person").build()?)
                 .build()?,
         )
-        .items(vec![ItemBuilder::default()
-            .name("Some name")
-            .unit_amount(Money {
-                currency_code: Currency::EUR,
-                value: "10.0".to_string(),
-            })
-            .quantity("1")
-            .build()?])
+        .items(vec![
+            ItemBuilder::default()
+                .name("Some name")
+                .unit_amount(Money {
+                    currency_code: Currency::EUR,
+                    value: "10.0".to_string(),
+                })
+                .quantity("1")
+                .build()?,
+        ])
         .build()?;
 
     let invoice = CreateDraftInvoice::new(payload);

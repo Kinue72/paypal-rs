@@ -1,8 +1,8 @@
+use paypal_rs::{Client, PaypalEnv};
 use paypal_rs::{
     api::orders::*,
     data::{common::AddressBuilder, orders::*},
 };
-use paypal_rs::{Client, PaypalEnv};
 use wiremock::matchers::{basic_auth, bearer_token, body_string, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -48,10 +48,12 @@ async fn test_create_order() -> color_eyre::Result<()> {
 
     let order = OrderPayloadBuilder::default()
         .intent(Intent::Authorize)
-        .purchase_units(vec![PurchaseUnitBuilder::default()
-            .reference_id("d9f80740-38f0-11e8-b467-0ed5f89f718b")
-            .amount(Amount::usd("100.00"))
-            .build()?])
+        .purchase_units(vec![
+            PurchaseUnitBuilder::default()
+                .reference_id("d9f80740-38f0-11e8-b467-0ed5f89f718b")
+                .amount(Amount::usd("100.00"))
+                .build()?,
+        ])
         .payment_source(
             OrderPaymentSourceBuilder::default()
                 .card(

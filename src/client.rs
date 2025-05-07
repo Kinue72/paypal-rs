@@ -7,9 +7,9 @@ use std::time::Duration;
 use std::time::Instant;
 
 use crate::{
+    AuthAssertionClaims, HeaderParams, LIVE_ENDPOINT, SANDBOX_ENDPOINT,
     endpoint::Endpoint,
     errors::{PaypalError, ResponseError},
-    AuthAssertionClaims, HeaderParams, LIVE_ENDPOINT, SANDBOX_ENDPOINT,
 };
 
 /// Represents the access token returned by the OAuth2 authentication.

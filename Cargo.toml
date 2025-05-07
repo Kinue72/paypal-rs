@@ -1,7 +1,7 @@
 [package]
 name = "paypal-rs"
 version = "0.2.6"
-authors = ["Edgar <git@edgarluque.com>"]
+authors = ["Edgar <git@edgarluque.com>", "Kinut <contact@onigiri.lgbt>"]
 description = "A library that wraps the paypal api asynchronously."
 repository = "https://github.com/edg-l/paypal-rs/"
 license = "MIT OR Apache-2.0"
@@ -9,27 +9,25 @@ keywords = ["paypal", "paypal-api"]
 categories = ["api-bindings", "web-programming::http-client"]
 documentation = "https://docs.rs/paypal-rs"
 readme = "README.md"
-edition = "2021"
+edition = "2024"
 
 
 [dependencies]
-reqwest = { version = "0.12.4", default-features = false, features = ["json"] }
-serde = { version = "1.0.203", features = ["derive"] }
-serde_json = "1.0.117"
-serde_with = "3.8.1"
-chrono = { version = "0.4.24", features = ["serde"] }
-jsonwebtoken = "9.3.0"
-base64 = "0.22.1"
-log = "0.4.21"
-bytes = "1.6.0"
-derive_builder = "0.20.0"
-serde_qs = "0.13.0"
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_with = "3.12"
+chrono = { version = "0.4", features = ["serde"] }
+jsonwebtoken = "9.3"
+base64 = "0.22"
+derive_builder = "0.20"
+serde_qs = "0.15"
 
 [dev-dependencies]
-tokio = { version = "1.38.0", features = ["macros", "rt-multi-thread"] }
-dotenvy = "0.15.7"
-color-eyre = "0.6.3"
-wiremock = "0.6.0"
+tokio = { version = "1.45", features = ["macros", "rt-multi-thread"] }
+dotenvy = "0.15"
+color-eyre = "0.6"
+wiremock = "0.6"
 
 [features]
 default = ["reqwest/native-tls"]

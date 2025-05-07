@@ -1,6 +1,6 @@
 //! This module contains the endpoint trait used to implemented api endpoints.
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::borrow::Cow;
 
 /// A trait implemented by api endpoints.

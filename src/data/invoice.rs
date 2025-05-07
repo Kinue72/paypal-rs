@@ -412,7 +412,7 @@ pub enum PaymentType {
 }
 
 /// The payment mode or method through which the invoicer can accept the payment.
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Eq, PartialEq, Copy, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PaymentMethod {
     /// Payments can be received through bank transfers.
@@ -426,17 +426,12 @@ pub enum PaymentMethod {
     /// Payments can be received through debit card payments.
     DebitCard,
     /// Payments can be received through paypal payments.
+    #[default]
     Paypal,
     /// Payments can be received through wire transfer.
     WireTransfer,
     /// Payments can be received through other modes.
     Other,
-}
-
-impl Default for PaymentMethod {
-    fn default() -> Self {
-        PaymentMethod::Paypal
-    }
 }
 
 /// Payment detail

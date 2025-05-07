@@ -12,12 +12,12 @@ use derive_builder::Builder;
 use serde::Serialize;
 
 use crate::{
+    Query,
     data::{
         invoice::{CancelReason, Invoice, InvoiceList, InvoicePayload, SendInvoicePayload},
         orders::InvoiceNumber,
     },
     endpoint::Endpoint,
-    Query,
 };
 
 /// Generates the next invoice number that is available to the merchant.
