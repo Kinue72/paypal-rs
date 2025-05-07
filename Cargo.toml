@@ -22,6 +22,7 @@ jsonwebtoken = "9.3"
 base64 = "0.22"
 derive_builder = "0.20"
 serde_qs = "0.15"
+strum = { version = "0.27", features = ["derive", "strum_macros"] }
 
 [dev-dependencies]
 tokio = { version = "1.45", features = ["macros", "rt-multi-thread"] }

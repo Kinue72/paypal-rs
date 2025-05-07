@@ -1,6 +1,7 @@
 //! Paypal object definitions used by the orders api.
 
 use super::common::*;
+use crate::data::tracking::ShipmentItem;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -273,25 +274,6 @@ pub enum TrackerStatus {
     /// This does not correspond to the carrier's actual status for the shipment.
     /// The latest status of the parcel must be retrieved from the carrier.
     Shipped,
-}
-/// item in the shipment.
-#[skip_serializing_none]
-#[derive(Debug, Default, Serialize, Deserialize, Clone, Builder)]
-pub struct ShipmentItem {
-    /// The item name or title.
-    pub name: Option<String>,
-    /// The item quantity. Must be a whole number.
-    pub quantity: Option<String>,
-    /// The stock keeping unit (SKU) for the item. This can contain unicode characters.
-    pub sku: Option<String>,
-    /// The URL to the item being purchased. Visible to buyer and used in buyer experiences.
-    pub url: Option<String>,
-    /// The URL of the item's image.
-    /// File type and size restrictions apply.
-    /// An image that violates these restrictions will not be honored.
-    pub image_url: Option<String>,
-    /// The Universal Product Code of the item.
-    pub upc: Option<ItemUpc>,
 }
 
 /// trackers for a transaction.
